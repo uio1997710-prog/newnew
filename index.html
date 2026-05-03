@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>百岳追蹤</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="百岳追蹤" />
+  <meta name="theme-color" content="#0C1610" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body { background: #0C1610; color: #DDD5BE; font-family: 'Georgia', serif; }
+    input, button { font-family: inherit; }
+    ::-webkit-scrollbar { display: none; }
+    .chip { padding: 5px 14px; border-radius: 20px; font-size: 12px; border: 1px solid #1E3525; color: #3A5E42; background: transparent; cursor: pointer; }
+    .chip.active { background: #1D4A2A; border-color: #52C78A; color: #7AD9A8; }
+    .rchip { padding: 4px 11px; border-radius: 20px; font-size: 11px; border: 1px solid #1A3020; color: #3A5042; background: transparent; cursor: pointer; white-space: nowrap; font-family: monospace; }
+    .rchip.active { background: #1D4A2A; border-color: #52C78A; color: #7AD9A8; }
+    .tab-btn { flex: 1; padding: 13px 0; background: none; border: none; border-bottom: 2px solid transparent; color: #3A5E42; font-size: 14px; cursor: pointer; }
+    .tab-btn.active { border-bottom-color: #52C78A; color: #52C78A; font-weight: 600; }
+    .peak-card { background: #0F1912; border: 1px solid #182A1E; border-left: 3px solid #182A1E; border-radius: 10px; padding: 11px 14px; display: flex; align-items: center; gap: 12px; cursor: pointer; margin-bottom: 5px; }
+    .peak-card.done { background: #142118; border-color: #265A34; border-left-color: #52C78A; }
+    .checkbox { width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0; border: 2px solid #264030; background: transparent; display: flex; align-items: center; justify-content: center; }
+    .checkbox.done { background: #52C78A; border-color: #52C78A; }
+    .dot { width: 26px; height: 26px; border-radius: 6px; background: #111C14; border: 1px solid #1E3020; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 10px; color: transparent; font-weight: 700; }
+    .dot.done { background: #1D4A2A; border-color: #52C78A; color: #52C78A; }
+    .login-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 40px 24px; background: #0C1610; }
+    .google-btn { display: flex; align-items: center; gap: 12px; background: #fff; color: #333; border: none; border-radius: 12px; padding: 14px 24px; font-size: 16px; font-weight: 600; cursor: pointer; width: 100%; max-width: 300px; justify-content: center; margin-top: 32px; }
+  </style>
+</head>
+<body>
+<div id="app" style="max-width:430px;margin:0 auto;min-height:100vh;overflow-x:hidden;"></div>
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyABkh2t8meAf9EWy0iHlofMwpYqwAugFL8",
+  authDomain: "bai-yue.firebaseapp.com",
+  projectId: "bai-yue",
+  storageBucket: "bai-yue.firebasestorage.app",
+  messagingSenderId: "309872388074",
+  appId: "1:309872388074:web:3ad4567e97a045df86f493",
+  measurementId: "G-90LQCWELKT"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const PEAKS=[
+  {id:1,name:"玉山主峰",alt:3952,group:"五嶽",difficulty:"A"},
+  {id:2,name:"雪山主峰",alt:3886,group:"五嶽",difficulty:"A"},
+  {id:3,name:"玉山東峰",alt:3869,group:"十峻",difficulty:"C+"},
+  {id:4,name:"玉山北峰",alt:3858,group:"八秀",difficulty:"B"},
+  {id:5,name:"玉山南峰",alt:3844,group:"十峻",difficulty:"C+"},
+  {id:6,name:"秀姑巒山",alt:3805,group:"五嶽",difficulty:"B"},
+  {id:7,name:"馬博拉斯山",alt:3785,group:"十峻",difficulty:"C+"},
+  {id:8,name:"南湖大山",alt:3742,group:"五嶽",difficulty:"B"},
+  {id:9,name:"東小南山",alt:3711,group:"九平",difficulty:"C"},
+  {id:10,name:"中央尖山",alt:3705,group:"三尖",difficulty:"C+"},
+  {id:11,name:"雪山北峰",alt:3703,group:"十潤",difficulty:"C+"},
+  {id:12,name:"關山",alt:3668,group:"十峻",difficulty:"C"},
+  {id:13,name:"大水窟山",alt:3642,group:"十潤",difficulty:"B"},
+  {id:14,name:"南湖大山東峰",alt:3632,group:"十巖",difficulty:"B"},
+  {id:15,name:"東郡大山",alt:3619,group:"十崇",difficulty:"C+"},
+  {id:16,name:"奇萊北峰",alt:3607,group:"十峻",difficulty:"B"},
+  {id:17,name:"向陽山",alt:3603,group:"八秀",difficulty:"A"},
+  {id:18,name:"大劍山",alt:3594,group:"十峻",difficulty:"B"},
+  {id:19,name:"雲峰",alt:3564,group:"九峨",difficulty:"C"},
+  {id:20,name:"奇萊主山",alt:3560,group:"九峨",difficulty:"B"},
+  {id:21,name:"馬利加南山",alt:3546,group:"十巖",difficulty:"C+"},
+  {id:22,name:"南湖北山",alt:3536,group:"十崇",difficulty:"B"},
+  {id:23,name:"大雪山",alt:3530,group:"十崇",difficulty:"C"},
+  {id:24,name:"品田山",alt:3524,group:"十峻",difficulty:"B"},
+  {id:25,name:"玉山西峰",alt:3518,group:"十翠",difficulty:"A"},
+  {id:26,name:"頭鷹山",alt:3510,group:"九峨",difficulty:"C"},
+  {id:27,name:"三叉山",alt:3496,group:"十崇",difficulty:"A"},
+  {id:28,name:"大霸尖山",alt:3492,group:"三尖",difficulty:"A"},
+  {id:29,name:"南湖大山南峰",alt:3475,group:"十巖",difficulty:"C"},
+  {id:30,name:"東巒大山",alt:3468,group:"八秀",difficulty:"C+"},
+  {id:31,name:"無明山",alt:3451,group:"十峻",difficulty:"C+"},
+  {id:32,name:"巴巴山",alt:3449,group:"八小巒",difficulty:"C"},
+  {id:33,name:"馬西山",alt:3443,group:"十崇",difficulty:"C+"},
+  {id:34,name:"北合歡山",alt:3422,group:"十崇",difficulty:"A"},
+  {id:35,name:"合歡山東峰",alt:3421,group:"九峨",difficulty:"A"},
+  {id:36,name:"小霸尖山",alt:3418,group:"八銳",difficulty:"B"},
+  {id:37,name:"合歡主峰",alt:3417,group:"十潤",difficulty:"A"},
+  {id:38,name:"南玉山",alt:3383,group:"十潤",difficulty:"C"},
+  {id:39,name:"畢祿山",alt:3371,group:"八瘦",difficulty:"A"},
+  {id:40,name:"卓社大山",alt:3369,group:"九峨",difficulty:"C"},
+  {id:41,name:"奇萊南峰",alt:3358,group:"十崇",difficulty:"A"},
+  {id:42,name:"南雙頭山",alt:3356,group:"九峨",difficulty:"C"},
+  {id:43,name:"能高山南峰",alt:3349,group:"十峻",difficulty:"C"},
+  {id:44,name:"志佳陽大山",alt:3345,group:"八秀",difficulty:"A"},
+  {id:45,name:"白姑大山",alt:3341,group:"十翠",difficulty:"B"},
+  {id:46,name:"八通關山",alt:3335,group:"八銳",difficulty:"A"},
+  {id:47,name:"新康山",alt:3331,group:"十峻",difficulty:"C"},
+  {id:48,name:"丹大山",alt:3325,group:"九嶂",difficulty:"C"},
+  {id:49,name:"桃山",alt:3325,group:"八秀",difficulty:"A"},
+  {id:50,name:"佳陽山",alt:3314,group:"八銳",difficulty:"B"},
+  {id:51,name:"火石山",alt:3310,group:"八銳",difficulty:"C"},
+  {id:52,name:"池有山",alt:3303,group:"六易",difficulty:"A"},
+  {id:53,name:"伊澤山",alt:3297,group:"六易",difficulty:"A"},
+  {id:54,name:"卑南主山",alt:3295,group:"十崇",difficulty:"C"},
+  {id:55,name:"干卓萬山",alt:3284,group:"八瘦",difficulty:"C"},
+  {id:56,name:"太魯閣大山",alt:3283,group:"十崇",difficulty:"C+"},
+  {id:57,name:"轆轆山",alt:3279,group:"八銳",difficulty:"C"},
+  {id:58,name:"喀西帕南山",alt:3276,group:"九偏",difficulty:"C+"},
+  {id:59,name:"內嶺爾山",alt:3275,group:"十崇",difficulty:"C"},
+  {id:60,name:"鈴鳴山",alt:3272,group:"八秀",difficulty:"B"},
+  {id:61,name:"郡大山",alt:3265,group:"八秀",difficulty:"A"},
+  {id:62,name:"能高山",alt:3262,group:"九峨",difficulty:"C"},
+  {id:63,name:"萬東山西峰",alt:3258,group:"九偏",difficulty:"C"},
+  {id:64,name:"劍山",alt:3253,group:"九嶂",difficulty:"C"},
+  {id:65,name:"屏風山",alt:3250,group:"九嶂",difficulty:"B"},
+  {id:66,name:"小關山",alt:3249,group:"九峨",difficulty:"C"},
+  {id:67,name:"義西請馬至山",alt:3245,group:"七峭",difficulty:"C+"},
+  {id:68,name:"牧山",alt:3241,group:"六易",difficulty:"C"},
+  {id:69,name:"玉山前峰",alt:3239,group:"六易",difficulty:"A"},
+  {id:70,name:"石門山",alt:3237,group:"八小巒",difficulty:"A"},
+  {id:71,name:"無雙山",alt:3231,group:"九嶂",difficulty:"C+"},
+  {id:72,name:"塔關山",alt:3222,group:"七峭",difficulty:"A"},
+  {id:73,name:"馬比衫山",alt:3211,group:"九平",difficulty:"C"},
+  {id:74,name:"達芬尖山",alt:3208,group:"三尖",difficulty:"C"},
+  {id:75,name:"雪山東峰",alt:3201,group:"八小巒",difficulty:"A"},
+  {id:76,name:"南華山",alt:3184,group:"八瘦",difficulty:"A"},
+  {id:77,name:"關山嶺山",alt:3176,group:"八瘦",difficulty:"A"},
+  {id:78,name:"海諾南山",alt:3174,group:"十潤",difficulty:"C"},
+  {id:79,name:"中雪山",alt:3173,group:"十翠",difficulty:"A"},
+  {id:80,name:"閂山",alt:3168,group:"八秀",difficulty:"A"},
+  {id:81,name:"甘薯峰",alt:3158,group:"八小巒",difficulty:"C+"},
+  {id:82,name:"西合歡山",alt:3145,group:"十翠",difficulty:"A"},
+  {id:83,name:"審馬陣山",alt:3141,group:"六肩稜",difficulty:"A"},
+  {id:84,name:"喀拉業山",alt:3133,group:"六肩稜",difficulty:"A"},
+  {id:85,name:"庫哈諾辛山",alt:3115,group:"九偏",difficulty:"A"},
+  {id:86,name:"加利山",alt:3112,group:"六肩稜",difficulty:"A"},
+  {id:87,name:"白石山",alt:3110,group:"七峭",difficulty:"C"},
+  {id:88,name:"磐石山",alt:3106,group:"九偏",difficulty:"C"},
+  {id:89,name:"帕托魯山",alt:3101,group:"十潤",difficulty:"C"},
+  {id:90,name:"北大武山",alt:3092,group:"五嶽",difficulty:"A"},
+  {id:91,name:"西巒大山",alt:3081,group:"七峭",difficulty:"A"},
+  {id:92,name:"塔芬山",alt:3070,group:"八銳",difficulty:"C"},
+  {id:93,name:"立霧主山",alt:3069,group:"十巖",difficulty:"C"},
+  {id:94,name:"安東軍山",alt:3068,group:"十潤",difficulty:"C"},
+  {id:95,name:"光頭山",alt:3060,group:"九平",difficulty:"C"},
+  {id:96,name:"羊頭山",alt:3035,group:"八瘦",difficulty:"A"},
+  {id:97,name:"布拉克桑山",alt:3026,group:"九嶂",difficulty:"C"},
+  {id:98,name:"駒盆山",alt:3022,group:"六肩稜",difficulty:"C+"},
+  {id:99,name:"六順山",alt:2999,group:"九平",difficulty:"B"},
+  {id:100,name:"鹿山",alt:2981,group:"六肩稜",difficulty:"C"},
+];
+
+const GROUPS=[...new Set(PEAKS.map(p=>p.group))];
+const DIFF_COLOR={"A":"#52C78A","B":"#5B9BD5","C":"#F5A623","C+":"#E85D75"};
+const DIFF_INFO=[["A","簡單","1-3天一般健行"],["B","普通","多天需體能"],["C","困難","技術性路線"],["C+","極難","高風險縱走"]];
+
+function getBadge(n){
+  if(n>=100)return{icon:"👑",label:"完百傳奇"};
+  if(n>=84)return{icon:"🌟",label:"縱走達人"};
+  if(n>=69)return{icon:"🦅",label:"高山行者"};
+  if(n>=49)return{icon:"⛰️",label:"進階山人"};
+  if(n>=29)return{icon:"🥾",label:"山徑探索者"};
+  if(n>=14)return{icon:"🍃",label:"健行者"};
+  return{icon:"🌱",label:"入門山友"};
+}
+
+// React App
+const {useState,useMemo,useEffect} = React;
+
+function LoginScreen({onLogin,loading}){
+  const e=React.createElement;
+  return e("div",{className:"login-screen"},
+    e("svg",{viewBox:"0 0 430 120",style:{width:"100%",opacity:0.15,marginBottom:8}},
+      e("polygon",{points:"0,120 80,30 140,70 220,5 300,55 360,20 430,60 430,120",fill:"#4CAF8A"}),
+      e("polygon",{points:"0,120 60,50 110,80 180,22 260,65 330,30 400,62 430,45 430,120",fill:"#2A5A3A"})
+    ),
+    e("div",{style:{fontSize:10,letterSpacing:5,color:"#3D6B4A",fontFamily:"monospace",marginBottom:12}},"TAIWAN · 台灣百岳"),
+    e("h1",{style:{fontSize:36,fontWeight:800,color:"#DDD5BE",textAlign:"center",lineHeight:1.2}},
+      "百岳",e("br"),e("span",{style:{color:"#52C78A"}},"追蹤")
+    ),
+    e("p",{style:{color:"#3D6B4A",fontSize:13,textAlign:"center",marginTop:16,lineHeight:1.6,fontFamily:"monospace"}},
+      "登入後記錄會儲存在雲端\n換手機也不會消失"
+    ),
+    e("button",{className:"google-btn",onClick:onLogin,disabled:loading},
+      e("svg",{width:20,height:20,viewBox:"0 0 48 48"},
+        e("path",{fill:"#FFC107",d:"M43.6 20H24v8h11.3C33.6 33.1 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34.1 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 20-8.9 20-20 0-1.3-.1-2.7-.4-4z"}),
+        e("path",{fill:"#FF3D00",d:"M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34.1 6.5 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"}),
+        e("path",{fill:"#4CAF50",d:"M24 44c5.2 0 9.9-1.9 13.5-5l-6.2-5.2C29.4 35.6 26.8 36 24 36c-5.2 0-9.6-2.9-11.3-7.1l-6.5 5C9.6 39.6 16.3 44 24 44z"}),
+        e("path",{fill:"#1976D2",d:"M43.6 20H24v8h11.3c-.9 2.5-2.6 4.6-4.8 6l6.2 5.2C40.7 35.5 44 30.2 44 24c0-1.3-.1-2.7-.4-4z"})
+      ),
+      loading ? "登入中..." : "用 Google 帳號登入"
+    ),
+    e("p",{style:{color:"#2A4030",fontSize:11,textAlign:"center",marginTop:24,fontFamily:"monospace"}},
+      "你的資料只有你自己看得到"
+    )
+  );
+}
+
+function App(){
+  const[user,setUser]=useState(null);
+  const[authLoading,setAuthLoading]=useState(true);
+  const[loginLoading,setLoginLoading]=useState(false);
+  const[completed,setCompleted]=useState(new Set());
+  const[search,setSearch]=useState("");
+  const[group,setGroup]=useState("全部");
+  const[tab,setTab]=useState("列表");
+  const[status,setStatus]=useState("全部");
+  const[diff,setDiff]=useState("全部");
+  const[saving,setSaving]=useState(false);
+
+  // 監聽登入狀態
+  useEffect(()=>{
+    const unsub=onAuthStateChanged(auth,async u=>{
+      setUser(u);
+      setAuthLoading(false);
+      if(u){
+        // 載入雲端資料
+        try{
+          const ref=doc(db,"users",u.uid);
+          const snap=await getDoc(ref);
+          if(snap.exists()){
+            const data=snap.data();
+            setCompleted(new Set(data.completed||[]));
+          }
+        }catch(err){console.log(err);}
+      }
+    });
+    return()=>unsub();
+  },[]);
+
+  const handleLogin=async()=>{
+    setLoginLoading(true);
+    try{
+      const provider=new GoogleAuthProvider();
+      await signInWithPopup(auth,provider);
+    }catch(err){
+      console.log(err);
+      alert("登入失敗，請再試一次");
+    }
+    setLoginLoading(false);
+  };
+
+  const handleLogout=async()=>{
+    if(confirm("確定要登出嗎？")){
+      await signOut(auth);
+      setCompleted(new Set());
+    }
+  };
+
+  const toggle=async(id)=>{
+    const s=new Set(completed);
+    s.has(id)?s.delete(id):s.add(id);
+    setCompleted(s);
+    // 儲存到雲端
+    setSaving(true);
+    try{
+      await setDoc(doc(db,"users",user.uid),{completed:[...s]},{merge:true});
+    }catch(err){console.log(err);}
+    setSaving(false);
+  };
+
+  const count=completed.size,pct=count,badge=getBadge(pct),C=2*Math.PI*40;
+  const filtered=useMemo(()=>PEAKS.filter(p=>{
+    if(search&&!p.name.includes(search)&&!p.group.includes(search))return false;
+    if(group!=="全部"&&p.group!==group)return false;
+    if(status==="已完成"&&!completed.has(p.id))return false;
+    if(status==="未完成"&&completed.has(p.id))return false;
+    if(diff!=="全部"&&p.difficulty!==diff)return false;
+    return true;
+  }),[search,group,status,diff,completed]);
+
+  const groupStats=GROUPS.map(g=>{
+    const all=PEAKS.filter(p=>p.group===g),done=all.filter(p=>completed.has(p.id));
+    return{name:g,total:all.length,done:done.length,pct:Math.round(done.length/all.length*100)};
+  }).sort((a,b)=>b.pct-a.pct);
+
+  const rc=pct>=75?"#52C78A":pct>=40?"#F5A623":"#5B9BD5";
+  const e=React.createElement;
+
+  // 載入中
+  if(authLoading) return e("div",{style:{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",background:"#0C1610"}},
+    e("div",{style:{color:"#3D6B4A",fontFamily:"monospace",fontSize:13}},"載入中...")
+  );
+
+  // 未登入
+  if(!user) return e(LoginScreen,{onLogin:handleLogin,loading:loginLoading});
+
+  // 已登入
+  return e("div",{style:{background:"#0C1610",minHeight:"100vh",color:"#DDD5BE",maxWidth:430,margin:"0 auto",overflowX:"hidden"}},
+
+    // HEADER
+    e("div",{style:{position:"relative",overflow:"hidden"}},
+      e("div",{style:{position:"absolute",inset:0,background:"linear-gradient(160deg,#0C2418,#0C1610 60%)"}}),
+      e("div",{style:{position:"relative",padding:"48px 24px 0"}},
+        e("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}},
+          e("div",{style:{fontSize:10,letterSpacing:5,color:"#3D6B4A",fontFamily:"monospace"}},"TAIWAN · 台灣百岳"),
+          e("div",{style:{display:"flex",alignItems:"center",gap:8}},
+            saving&&e("span",{style:{fontSize:10,color:"#3D6B4A",fontFamily:"monospace"}},"儲存中..."),
+            e("button",{onClick:handleLogout,style:{background:"none",border:"1px solid #2A4030",borderRadius:8,padding:"4px 10px",color:"#3D6B4A",fontSize:11,cursor:"pointer",fontFamily:"monospace"}},"登出")
+          )
+        ),
+        e("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}},
+          e("div",null,
+            e("h1",{style:{margin:0,fontSize:28,fontWeight:700,lineHeight:1.2}},"百岳完成度",e("br"),e("span",{style:{color:"#52C78A"}},"追蹤")),
+            e("div",{style:{marginTop:6,display:"flex",alignItems:"center",gap:6}},
+              e("img",{src:user.photoURL,style:{width:18,height:18,borderRadius:"50%"},onError:ev=>ev.target.style.display="none"}),
+              e("span",{style:{fontSize:11,color:"#3D6B4A",fontFamily:"monospace"}},user.displayName||user.email)
+            ),
+            e("div",{style:{marginTop:6,display:"flex",alignItems:"center",gap:8}},
+              e("span",{style:{fontSize:16}},badge.icon),
+              e("span",{style:{fontSize:12,color:"#3D6B4A",fontFamily:"monospace"}},badge.label)
+            )
+          ),
+          e("div",{style:{position:"relative",width:96,height:96}},
+            e("svg",{width:96,height:96,style:{transform:"rotate(-90deg)"}},
+              e("circle",{cx:48,cy:48,r:40,fill:"none",stroke:"#1A3525",strokeWidth:8}),
+              e("circle",{cx:48,cy:48,r:40,fill:"none",stroke:rc,strokeWidth:8,strokeDasharray:C,strokeDashoffset:C*(1-pct/100),strokeLinecap:"round"})
+            ),
+            e("div",{style:{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}},
+              e("span",{style:{fontSize:22,fontWeight:800,lineHeight:1}},pct+"%"),
+              e("span",{style:{fontSize:9,color:"#3D6B4A",fontFamily:"monospace"}},count+"/100")
+            )
+          )
+        ),
+        e("div",{style:{marginTop:16}},
+          e("div",{style:{background:"#152218",borderRadius:6,height:6,overflow:"hidden"}},
+            e("div",{style:{height:"100%",borderRadius:6,background:"linear-gradient(90deg,#2A7A50,#52C78A)",width:pct+"%"}})
+          ),
+          e("div",{style:{display:"flex",justifyContent:"space-between",fontSize:10,color:"#3D6B4A",fontFamily:"monospace",marginTop:5}},
+            e("span",null,"✓ "+count+" 座已完成"),
+            e("span",null,(100-count)+" 座待征服")
+          )
+        )
+      ),
+      e("svg",{viewBox:"0 0 430 70",style:{width:"100%",display:"block",marginTop:16,opacity:0.1}},
+        e("polygon",{points:"0,70 80,15 140,45 220,2 300,35 360,10 430,40 430,70",fill:"#4CAF8A"}),
+        e("polygon",{points:"0,70 60,30 110,55 180,14 260,45 330,18 400,44 430,30 430,70",fill:"#2A5A3A"})
+      )
+    ),
+
+    // TABS
+    e("div",{style:{position:"sticky",top:0,zIndex:20,background:"#0C1610ee",borderBottom:"1px solid #1A3020",display:"flex"}},
+      ["列表","群組"].map(t=>e("button",{key:t,className:"tab-btn"+(tab===t?" active":""),onClick:()=>setTab(t)},t))
+    ),
+
+    // 列表 TAB
+    tab==="列表"&&e("div",{style:{padding:"14px 16px"}},
+      e("div",{style:{background:"#111C14",border:"1px solid #1E3525",borderRadius:10,padding:"9px 14px",display:"flex",alignItems:"center",gap:8,marginBottom:10}},
+        e("span",{style:{color:"#3D6B4A"}},"🔍"),
+        e("input",{value:search,onChange:ev=>setSearch(ev.target.value),placeholder:"搜尋山峰或群組...",style:{flex:1,background:"none",border:"none",outline:"none",color:"#DDD5BE",fontSize:14}}),
+        search&&e("span",{onClick:()=>setSearch(""),style:{color:"#3D6B4A",cursor:"pointer",fontSize:20}},"×")
+      ),
+      e("div",{style:{display:"flex",gap:6,marginBottom:8}},
+        ["全部","已完成","未完成"].map(f=>e("button",{key:f,className:"chip"+(status===f?" active":""),onClick:()=>setStatus(f)},f))
+      ),
+      e("div",{style:{display:"flex",gap:5,marginBottom:8}},
+        ["全部","A","B","C","C+"].map(d=>e("button",{key:d,onClick:()=>setDiff(d),style:{
+          padding:"4px 12px",borderRadius:20,fontSize:11,cursor:"pointer",fontFamily:"monospace",
+          background:diff===d?(d==="全部"?"#1D4A2A":DIFF_COLOR[d]+"33"):"transparent",
+          border:"1px solid "+(diff===d?(d==="全部"?"#52C78A":DIFF_COLOR[d]):"#1A3020"),
+          color:diff===d?(d==="全部"?"#7AD9A8":DIFF_COLOR[d]):"#3A5042",
+        }},d))
+      ),
+      e("div",{style:{display:"flex",gap:5,marginBottom:10,overflowX:"auto",paddingBottom:4}},
+        ["全部",...GROUPS].map(g=>e("button",{key:g,className:"rchip"+(group===g?" active":""),onClick:()=>setGroup(g)},g))
+      ),
+      e("div",{style:{background:"#0F1912",border:"1px solid #1E3525",borderRadius:12,padding:"10px 14px",marginBottom:12}},
+        e("div",{style:{fontSize:10,color:"#3D6B4A",fontFamily:"monospace",marginBottom:8,letterSpacing:2}},"難度分級"),
+        e("div",{style:{display:"flex",gap:6}},
+          DIFF_INFO.map(([d,l,desc])=>e("div",{key:d,style:{flex:1,background:DIFF_COLOR[d]+"15",border:"1px solid "+DIFF_COLOR[d]+"44",borderRadius:8,padding:"8px 6px",textAlign:"center"}},
+            e("div",{style:{fontSize:16,fontWeight:800,color:DIFF_COLOR[d],fontFamily:"monospace",lineHeight:1}},d),
+            e("div",{style:{fontSize:10,color:DIFF_COLOR[d],fontWeight:600,marginTop:3}},l),
+            e("div",{style:{fontSize:9,color:"#3D6B4A",marginTop:2,lineHeight:1.3}},desc)
+          ))
+        )
+      ),
+      e("div",{style:{fontSize:11,color:"#2E4E36",fontFamily:"monospace",marginBottom:10}},"顯示 "+filtered.length+" / 100　· 點擊勾選"),
+      e("div",null,
+        filtered.map(peak=>{
+          const done=completed.has(peak.id),dc=DIFF_COLOR[peak.difficulty];
+          return e("div",{key:peak.id,className:"peak-card"+(done?" done":""),onClick:()=>toggle(peak.id)},
+            e("div",{className:"checkbox"+(done?" done":"")},
+              done&&e("svg",{width:12,height:12,viewBox:"0 0 12 12",fill:"none"},e("path",{d:"M2 6l3 3 5-5",stroke:"#0C1610",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"}))
+            ),
+            e("div",{style:{flex:1,minWidth:0}},
+              e("div",{style:{fontSize:15,fontWeight:done?600:400,color:done?"#86D4AA":"#C8C0AA"}},
+                peak.name,e("span",{style:{fontSize:10,color:"#2E4E36",marginLeft:7,fontFamily:"monospace"}},"#"+String(peak.id).padStart(3,"0"))
+              ),
+              e("div",{style:{fontSize:11,color:"#2E4E36",fontFamily:"monospace",marginTop:2}},peak.alt.toLocaleString()+" m · "+peak.group)
+            ),
+            e("div",{style:{flexShrink:0,textAlign:"center"}},
+              e("div",{style:{background:dc+"22",border:"1px solid "+dc,borderRadius:6,padding:"3px 8px",fontSize:12,fontWeight:700,color:dc,fontFamily:"monospace"}},peak.difficulty),
+              e("div",{style:{fontSize:9,color:dc,marginTop:2,fontFamily:"monospace"}},peak.difficulty==="A"?"簡單":peak.difficulty==="B"?"普通":peak.difficulty==="C"?"困難":"極難")
+            )
+          );
+        }),
+        filtered.length===0&&e("div",{style:{textAlign:"center",padding:"48px 0",color:"#2E4E36"}},
+          e("div",{style:{fontSize:36,marginBottom:10}},"⛰"),
+          e("div",{style:{fontFamily:"monospace",fontSize:13}},"找不到符合條件的山峰")
+        )
+      )
+    ),
+
+    // 群組 TAB
+    tab==="群組"&&e("div",{style:{padding:"16px 16px"}},
+      e("div",{style:{background:"#0F1912",border:"1px solid #1E3525",borderRadius:14,padding:"14px 18px",marginBottom:12}},
+        e("div",{style:{fontSize:11,color:"#3D6B4A",fontFamily:"monospace",marginBottom:10}},"整體完成統計"),
+        e("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:10}},
+          [{val:count,label:"已完成",col:"#52C78A"},{val:100-count,label:"待征服",col:"#3D6B4A"},{val:pct+"%",label:"完成率",col:"#F5A623"}].map(s=>
+            e("div",{key:s.label,style:{textAlign:"center"}},
+              e("div",{style:{fontSize:24,fontWeight:800,color:s.col,lineHeight:1}},s.val),
+              e("div",{style:{fontSize:10,color:"#2E4E36",fontFamily:"monospace",marginTop:3}},s.label)
+            )
+          )
+        ),
+        e("div",{style:{background:"#0C1610",borderRadius:5,height:6,overflow:"hidden"}},
+          e("div",{style:{height:"100%",borderRadius:5,background:"linear-gradient(90deg,#2A7A50,#52C78A)",width:pct+"%"}})
+        )
+      ),
+      e("div",{style:{display:"flex",flexDirection:"column",gap:10}},
+        groupStats.map(g=>{
+          const c=g.pct>=80?"#52C78A":g.pct>=50?"#F5A623":g.pct>0?"#5B9BD5":"#2A4030";
+          const gPeaks=PEAKS.filter(p=>p.group===g.name);
+          return e("div",{key:g.name,style:{background:"#0F1912",border:"1px solid #182A1E",borderRadius:14,padding:"14px 16px"}},
+            e("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}},
+              e("div",null,
+                e("div",{style:{fontSize:15,fontWeight:600,color:"#C8C0AA"}},g.name),
+                e("div",{style:{fontSize:11,color:"#2E4E36",fontFamily:"monospace",marginTop:2}},g.done+" / "+g.total+" 座完成")
+              ),
+              e("div",{style:{fontSize:26,fontWeight:900,color:c}},g.pct+"%")
+            ),
+            e("div",{style:{background:"#0C1610",borderRadius:4,height:4,overflow:"hidden",marginBottom:10}},
+              e("div",{style:{height:"100%",borderRadius:4,background:c,width:g.pct+"%",minWidth:g.pct>0?4:0}})
+            ),
+            e("div",{style:{display:"flex",flexWrap:"wrap",gap:4}},
+              gPeaks.map(p=>e("div",{key:p.id,title:p.name+" "+p.difficulty,className:"dot"+(completed.has(p.id)?" done":""),onClick:()=>toggle(p.id)},completed.has(p.id)?"✓":""))
+            ),
+            g.done>0&&e("div",{style:{marginTop:8,fontSize:10,color:"#3D6B4A",fontFamily:"monospace",lineHeight:1.6}},
+              gPeaks.filter(p=>completed.has(p.id)).map(p=>p.name).join("、")
+            )
+          );
+        })
+      )
+    ),
+    e("div",{style:{height:48}}),
+
+    // 回到頂部按鈕
+    e("button",{
+      onClick:()=>window.scrollTo({top:0,behavior:"smooth"}),
+      style:{
+        position:"fixed",
+        bottom:28,
+        right:20,
+        width:44,
+        height:44,
+        borderRadius:"50%",
+        background:"#1D4A2A",
+        border:"1px solid #52C78A",
+        color:"#52C78A",
+        fontSize:20,
+        cursor:"pointer",
+        display:"flex",
+        alignItems:"center",
+        justifyContent:"center",
+        boxShadow:"0 4px 16px #00000066",
+        zIndex:99,
+      }
+    },"↑")
+  );
+}
+
+// 載入 React 後啟動
+import("https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js").catch(()=>{});
+window.addEventListener("load",()=>{
+  ReactDOM.createRoot(document.getElementById("app")).render(React.createElement(App));
+});
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+</body>
+</html>
